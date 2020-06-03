@@ -5,6 +5,7 @@ from keras.layers import MaxPooling2D # Pooling
 from keras.layers import Flatten
 from keras.layers import Dense
 from keras.layers import Dropout
+from keras.layers import LeakyReLU
 from sklearn.model_selection import train_test_split
 from keras.models import load_model
 import matplotlib.pyplot as plt
@@ -24,7 +25,7 @@ with open("data\\label_pokm.json", "r") as f:
 # there are too many noises from type "poison"
 label = ["Fire", "Water", "Grass"]
 
-
+"""
 label_data = []
 data = []
 for typ in label:
@@ -35,9 +36,8 @@ for typ in label:
             pokm_img = Image.open(f"data\\{dire}\\{filename}")
             (width, height) = (pokm_img.width // 10, pokm_img.height // 10)
             pokm_img = pokm_img.resize((width, height))
-            pokm_arr = preprocessing.image.img_to_array(pokm_img, dtype = "int8")
-            # Delete the last plate so it become (60, 60, 3) (RGB) array, otherwise it's RGBA
-            pokm_arr = np.delete(pokm_arr, 3, 2)
+            pokm_arr = np.array(pokm_img)
+            pokm_arr = np.divide(pokm_arr, 255)
             label_data.append(typ)
             data.append(pokm_arr)
 
@@ -45,20 +45,19 @@ for typ in label:
 
 # Build the model
 model = Sequential()
-model.add(Conv2D(16, (3, 3), input_shape=(60, 60, 3), activation= "sigmoid"))
-model.add(MaxPooling2D(pool_size= (2, 2)))
+model.add(Conv2D(16, (3, 3), input_shape=(60, 60, 4), activation= "relu"))
+model.add(MaxPooling2D(pool_size= (3, 3)))
 model.add(Dropout(0.4))
 
 # Second convolutional layer
-model.add(Conv2D(16, (2, 2), activation= 'relu'))
+model.add(Conv2D(8, (3, 3), activation= "relu"))
 model.add(MaxPooling2D(pool_size= (3, 3)))
 model.add(Dropout(0.4))
 
 model.add(Flatten())
-model.add(Dense(units=512, activation= 'relu'))
-model.add(Dropout(0.4))
+model.add(Dense(units=512, activation= "relu"))
+model.add(Dropout(0.3))
 model.add(Dense(units=32, activation= 'relu'))
-
 model.add(Dense(units=len(label), activation= 'softmax'))
 
 model.compile(optimizer = 'adam', loss = 'binary_crossentropy', metrics = ['accuracy'])
@@ -78,13 +77,12 @@ for typ in label:
 x = np.array(x)
 y = np.array(y)
 
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2, random_state=1)
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.15, random_state=1)
 
 
 # fit the model
-type_model = model.fit(x_train, y_train, batch_size=2, epochs= 50, verbose = 2, validation_data= (x_test, y_test), shuffle= True)
+type_model = model.fit(x_train, y_train, batch_size=16, epochs= 100, verbose = 2, validation_data= (x_test, y_test), shuffle= True)
 
-print(type_model.history.keys())
 # summarize history for accuracy
 plt.plot(type_model.history['accuracy'])
 plt.plot(type_model.history['val_accuracy'])
@@ -95,10 +93,12 @@ plt.legend(['train', 'test'], loc='upper left')
 plt.show()
 
 model.save("CNN_model.h5")
-
+"""
 #get around 75~80% accuracy for validation set, share your parameter if you have better results :)
 
-model = load_model("CNN_model.h5")
+#model = load_model("CNN_model.h5")
+# This should be the best model so far
+model = load_model("CNN_bestModelSoFar.h5")
 
 # make prediction
 Palkia = "484Palkia"
@@ -106,15 +106,16 @@ Simisear = "514Simisear"
 Ferrothorn = "598Ferrothorn"
 Frogadier = "657Frogadier"
 Talonflame = "663Talonflame"
-predict = Talonflame
+predict = Frogadier
 path = f"test_image\\{predict}.png"
 pokm_img = Image.open(path)
 pokm_img = pokm_img.resize((60, 60))
-pokm_arr = preprocessing.image.img_to_array(pokm_img, dtype = "int8")
-pokm_arr = np.delete(pokm_arr, 2, 2)
+pokm_arr = np.array(pokm_img, dtype = float)
+
+pokm_arr = pokm_arr/ 255
 
 # Idk why it need a fourth dimension
-pokm_arr = pokm_arr.reshape(-1, 60, 60, 3)
+pokm_arr = pokm_arr.reshape(-1, 60, 60, 4)
 
 result = model.predict(pokm_arr)
 print(f"Predicted type for {predict}")
@@ -124,3 +125,4 @@ print(result_dict)
 
 # comment: it seems like the model prioritise shape over color
 # it will be better if we just use the type-1 pokemon in training
+# Probabilty better if there are more data :P
